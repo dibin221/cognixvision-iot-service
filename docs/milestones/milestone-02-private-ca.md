@@ -104,7 +104,9 @@ No MQTT or backend mTLS is being configured yet.
 | Root CA public key | Derived from private key / represented in certificate | Certificate verification | No | Not stored separately yet |
 | Root CA certificate | OpenSSL on development machine | Future trust stores / certificate verification | No | Not generated yet |
 
-### Current local artifact
+### Local artifact location
+
+The PKI workspace is outside the Git repository. Documentation intentionally uses a generic placeholder:
 
 ```text
 <local-pki-directory>/
@@ -112,6 +114,32 @@ No MQTT or backend mTLS is being configured yet.
 ```
 
 The private key is deliberately outside the Git repository.
+
+## Commands used so far
+
+### Verify OpenSSL
+
+```powershell
+openssl version
+```
+
+### Generate the Root CA private key
+
+```powershell
+openssl genrsa -out cognixvision-root-ca.key 4096
+```
+
+### Verify the private key without printing it
+
+```powershell
+openssl rsa -in cognixvision-root-ca.key -check -noout
+```
+
+Expected result:
+
+```text
+RSA key ok
+```
 
 ## Who trusts whom?
 
