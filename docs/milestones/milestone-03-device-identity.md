@@ -1,7 +1,7 @@
 # Milestone 03 — Device Identity
 
 ## Status
-In progress — design documented; device private key generation is the next implementation step
+In progress — production-inspired design documented; device key generation will occur on the ESP32
 
 ## Previous milestone recap
 Milestone 02 created and verified the CognixVision Root CA:
@@ -17,12 +17,14 @@ The Root CA certificate is self-signed, contains the CA public key, has `CA:TRUE
 Milestone 03 connects that trust anchor to an individual IoT device.
 
 ## Objective
-Create a unique cryptographic identity for an ESP32 device that can later be certified by the CognixVision Root CA.
+Establish a **production-inspired cryptographic identity model** in which each ESP32 generates and retains its own private key. The private key must never be exported to the CA, backend, Git repository, or operator workstation.
 
-The first artifact is the **device private key**. The device will keep this private key secret. The corresponding public key will be placed into a Certificate Signing Request (CSR), which the CA can then sign to create the device certificate.
+The device will generate its key pair locally, create a Certificate Signing Request (CSR), and provide only the CSR to the CA/provisioning process. The CA will sign the CSR and return the device certificate.
 
 ## Why we are doing this
-An IoT platform should not identify a device only by a serial number or an IP address. A cryptographic device identity provides a way to prove possession of a secret during authentication.
+An IoT platform should not identify a device only by a serial number or IP address. A cryptographic device identity provides a way to prove possession of a secret during authentication.
+
+More importantly, the private key should be generated where it will be used. Generating a device private key on an operator workstation and then transferring it to the ESP32 would create an unnecessary copy of the secret and would not represent the production-inspired architecture we want to learn.
 
 This will eventually support an mTLS flow such as:
 
@@ -42,170 +44,198 @@ ESP32                              MQTT / Backend
 The intended certificate chain is:
 
 ```text
-CognixVision Root CA
-       │
-       │ signs
-       ▼
-ESP32 Device Certificate
-       │
-       │ contains
-       ▼
-ESP32 Device Public Key
+                    CognixVision Root CA
+                           │
+                           │ signs CSR
+                           ▼
+                    Device Certificate
+                           │
+                           │ contains
+                           ▼
+                    Device Public Key
 
-ESP32 separately holds:
-ESP32 Device Private Key 🔐
+ESP32 keeps separately:
+                    Device Private Key 🔐
 ```
 
 The CA private key remains only on the CA side.
 
+### Production-inspired provisioning flow
+
 ```text
-CA side                                  Device side
-────────                                  ───────────
-Root CA private key 🔐                    Device private key 🔐
-Root CA certificate 📜                    Device certificate 📜
-        │                                         │
-        └──── signs device certificate ──────────┘
+ESP32
+  │
+  │ 1. Generate device key pair locally
+  │
+  ├── 🔐 Device private key (never leaves ESP32)
+  │
+  │ 2. Generate CSR
+  │
+  ├──────── CSR containing public key ────────► Provisioning / CA
+  │                                             │
+  │                                             │ 3. Validate request
+  │                                             │ 4. CA signs certificate
+  │                                             │
+  │◄──────────── Device certificate ───────────┤
+  │
+  │ 5. Store certificate
+  │
+  ▼
+ESP32 now has its cryptographic identity
 ```
 
 ## Important terminology — simple first
 
 ### Device private key
-A secret key generated specifically for one device. It must remain under the device's control.
+A secret key generated specifically for one device. It remains on the device and is used to prove possession of the device identity.
 
 ### Device public key
 The non-secret counterpart of the device private key. It can be included in a CSR and certificate.
 
 ### CSR (Certificate Signing Request)
-A request containing the device identity information and public key, signed by the device private key. The CA uses the CSR as input when issuing a certificate.
+A request containing device identity information and the device public key. The CSR is signed using the device private key so the CA can verify that the requester possesses the corresponding private key.
 
 ### Device certificate
 A certificate signed by the Root CA that binds the device identity to its public key.
+
+### Bootstrap/provisioning identity
+The mechanism used to establish enough initial trust for a device to request its long-term certificate. We will design this explicitly rather than assuming the device is already trusted.
 
 ### Key distinction
 
 ```text
 Private key  → secret → proves possession / signs
 Public key   → shareable → verifies signatures
-Certificate  → signed identity + public key
+CSR          → request containing public key + identity, signed by device key
+Certificate  → CA-signed identity + public key
 ```
 
 ## Planned artifact lifecycle
 
 ```text
-1. Generate device private key
+1. ESP32 generates device private/public key pair
+             │
+             │ private key stays on ESP32
+             ▼
+2. ESP32 generates CSR
+             │
+             │ CSR contains public key
+             ▼
+3. CSR reaches provisioning/CA process
              │
              ▼
-2. Generate CSR using device private key
-             │
-             ▼
-3. Submit CSR to CA
-             │
-             ▼
-4. CA verifies/request processing
+4. CA validates request
              │
              ▼
 5. CA signs device certificate
              │
              ▼
-6. Device receives certificate
+6. Certificate is returned to ESP32
+             │
+             ▼
+7. ESP32 uses certificate + private key for future mTLS
 ```
 
 ## Artifact ownership and trust
 
 | Artifact | Generated by | Stored/used by | Secret? |
 |---|---|---|---|
-| Root CA private key | CA operator | CA environment | **Yes** |
-| Root CA certificate | CA operator | Trusting systems | No |
-| Device private key | Device provisioning process | ESP32 | **Yes** |
-| Device public key | Derived from device private key | CSR/certificate | No |
-| Device CSR | Provisioning process | CA | No, but contains public identity material |
+| Root CA private key | CA operator/provisioning environment | CA environment | **Yes** |
+| Root CA certificate | CA operator/provisioning environment | Trusting systems | No |
+| Device private key | **ESP32** | **ESP32 only** | **Yes** |
+| Device public key | ESP32 / derived from device key | CSR/certificate | No |
+| Device CSR | **ESP32** | Provisioning/CA | No, but contains public identity material |
 | Device certificate | CA | ESP32 / verifier | No |
 
 ## Security requirements
 
 1. The Root CA private key must never be installed on the ESP32.
-2. The device private key must not be committed to Git.
-3. The device private key must not be sent to the backend.
-4. The device should eventually prove possession of its private key rather than sending the private key itself.
+2. The device private key must be generated on the ESP32 for the production-inspired design.
+3. The device private key must never be exported to the backend, CA, Git, or operator workstation.
+4. The device should prove possession of its private key rather than transmitting the private key itself.
 5. Device certificates can be distributed to the device and to systems that need to authenticate it.
-6. Production provisioning should use protected key storage where available; this lab initially uses the local development workflow for learning.
+6. Production devices should use protected key storage where available; this lab will first use the ESP32's available cryptographic facilities and then evaluate secure-element/flash-encryption options where appropriate.
+7. The provisioning/bootstrap mechanism must be treated as a separate trust decision and documented before production use.
 
-## Commands
+## Current implementation step
 
-### Generate an RSA device private key
+We are **not** generating the device private key with OpenSSL on the workstation.
 
-Run from the local PKI workspace:
+The earlier proposed command:
 
 ```powershell
 openssl genrsa -out esp32-device-001.key 2048
 ```
 
-This creates a separate 2048-bit RSA key for the device.
+is intentionally **not part of the implementation** because it would create the device private key outside the device.
 
-### Verify the device private key without printing it
+The next implementation step is to generate the device key pair from the ESP32 firmware using a suitable cryptographic library supported by the Arduino/ESP32 environment.
 
-```powershell
-openssl rsa -in esp32-device-001.key -check -noout
-```
+## Testing plan
 
-Expected result:
+For the device-generated key, we will verify:
 
-```text
-RSA key ok
-```
+1. The ESP32 successfully generates a key pair.
+2. The private key is not printed to Serial or transmitted over Wi-Fi.
+3. The public key can be derived/exported without exposing the private key.
+4. The ESP32 can generate a CSR using the private key.
+5. The CSR can be inspected on the provisioning/CA side.
+6. The CA can sign the CSR without receiving the device private key.
 
-The command above is the **next implementation step** for this milestone.
+## Expected result for this milestone
 
-## Expected result for the current step
-
-A new file should exist in the local PKI workspace:
-
-```text
-<local-pki-directory>/
-└── esp32-device-001.key
-```
-
-It must not be added to the Git repository.
-
-## Testing
-
-After generation, verify the private key with:
-
-```powershell
-openssl rsa -in esp32-device-001.key -check -noout
-```
-
-The expected output is:
+The ESP32 should eventually contain:
 
 ```text
-RSA key ok
+ESP32 secure/local storage
+├── Device private key 🔐
+└── Device certificate 📜
 ```
 
-The actual result will be recorded after the command is executed.
+The CA environment should contain:
+
+```text
+CA environment
+├── Root CA private key 🔐
+└── Root CA certificate 📜
+```
+
+The CA must never receive the ESP32 private key.
 
 ## Decisions made
 
-### Separate device key from CA key
-Each device gets its own key pair. Compromise of one device key should not expose the CA private key or automatically compromise other devices.
+### Production-inspired device key generation
+The device private key is generated on the ESP32 rather than on the workstation. This better models a real device-provisioning architecture and avoids unnecessary exposure of the private key.
 
-### RSA for the first implementation
-The project uses RSA for the initial lab PKI because the earlier Root CA already uses RSA and the OpenSSL operations are straightforward to inspect. We can evaluate ECC/Ed25519 later if required by the ESP32 TLS stack and production design.
+### Separate key per device
+Each device gets its own unique key pair. Compromise of one device key should not expose the CA private key or automatically compromise other devices.
+
+### RSA Root CA, device-key algorithm to be selected based on ESP32 support
+The Root CA already uses RSA 4096. For the device key, we will select an algorithm supported reliably by the ESP32 TLS/Arduino stack and appropriate for constrained devices. We will not assume that the CA and device must use the same key algorithm.
 
 ### Device identifier
-The initial lab device identifier is `esp32-device-001`. This is a logical test identity, not yet a production provisioning identifier.
+The initial logical test identity is `esp32-device-001`. It is an application-level lab identifier, not a claim about the hardware's immutable identity.
 
-## Problems encountered
+## Problems encountered / design correction
 
-None for this milestone so far.
+The initial plan proposed generating `esp32-device-001.key` on the workstation. That was corrected before implementation because the private key should be generated and retained by the device in the production-inspired architecture.
+
+This correction is intentionally recorded so the repository remains an accurate history of the design decision.
+
+## What changed from the previous milestone
+
+Milestone 02 established the Root CA trust anchor. Milestone 03 now establishes the device-side identity model and explicitly places private-key generation on the ESP32.
 
 ## What you should now understand
 
-- The Root CA and the device do **not** share the same private key.
-- The device has its own unique private/public key pair.
-- The device private key stays secret on the device side.
-- The CA will eventually sign a certificate containing the device public key.
-- A CSR is the bridge between the device's key pair and the CA-issued certificate.
+- The Root CA has its own key pair; the device has a completely separate key pair.
+- The ESP32 should generate its own private key for the production-inspired design.
+- The device private key should never be sent to the CA or backend.
+- The CSR is the safe handoff artifact: it contains the public key and identity information, not the private key.
+- The CA signs the CSR and returns a certificate.
+- The resulting certificate and private key together allow the ESP32 to authenticate using mTLS later.
+- We still need to design the initial bootstrap/provisioning trust mechanism.
 
 ## Next step
 
-Generate and verify the `esp32-device-001` private key. After that result is confirmed, we will create the CSR as a separate step and inspect exactly what it contains before asking the Root CA to sign it.
+Implement **device key-pair generation on the ESP32**. We will first determine the appropriate Arduino/ESP32 cryptographic API available in the current environment, implement only key generation, test it, and document the actual result before moving to CSR generation.
