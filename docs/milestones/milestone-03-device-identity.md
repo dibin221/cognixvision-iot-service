@@ -1,7 +1,7 @@
 # Milestone 03 — Device Identity
 
 ## Status
-In progress — **device key generation and reboot persistence verified; CSR generation is the next implementation step**
+In progress — **device key generation and reboot persistence verified; CSR generation and inspection verified; CA signing is the next step**
 
 ## Previous milestone recap
 Milestone 02 created and verified the CognixVision Root CA:
@@ -20,6 +20,8 @@ Milestone 03 connects that trust anchor to an individual IoT device.
 Establish a **production-inspired cryptographic identity model** in which each ESP32 generates and retains its own private key. The private key must never be exported to the CA, backend, Git repository, or operator workstation.
 
 The device generates its key pair locally, retains the private key across reboots, creates a Certificate Signing Request (CSR), and provides only the CSR to the CA/provisioning process. The CA will sign the CSR and return the device certificate.
+
+For learning purposes, the CSR creation step is currently being demonstrated on the laptop using a separate learning key. This temporary exercise is intentionally separate from the target production-inspired ESP32 key lifecycle.
 
 ## Why we are doing this
 An IoT platform should not identify a device only by a serial number or IP address. A cryptographic device identity provides a way to prove possession of a secret during authentication.
@@ -62,7 +64,7 @@ ESP32 keeps separately:
 
 The CA private key remains only on the CA side.
 
-### Current implemented provisioning/identity flow
+### Current implemented device identity flow
 
 ```text
 ESP32 boot
@@ -81,7 +83,29 @@ Check NVS identity marker
                               └── continue boot
 ```
 
-### Next certificate provisioning flow
+### Current learning CSR flow
+
+```text
+Laptop learning environment
+   │
+   ├── generate temporary learning device key
+   │
+   └── generate CSR
+          │
+          │ contains public key + requested identity
+          ▼
+     device-001.csr.pem
+          │
+          ▼
+     Root CA signing
+          │
+          ▼
+     device-001 certificate
+```
+
+This laptop flow is a temporary learning aid. It does **not** replace the production-inspired decision that the ESP32 should generate and retain its own private key.
+
+### Target certificate provisioning flow
 
 ```text
 ESP32
@@ -161,9 +185,9 @@ Certificate  → CA-signed identity + public key
 |---|---|---|---|
 | Root CA private key | CA operator/provisioning environment | CA environment | **Yes** |
 | Root CA certificate | CA operator/provisioning environment | Trusting systems | No |
-| Device private key | **ESP32** | **ESP32 only** | **Yes** |
-| Device public key | ESP32 / derived from device key | CSR/certificate | No |
-| Device CSR | **ESP32** | Provisioning/CA | No, but contains public identity material |
+| Device private key | **ESP32** in target design; laptop only for temporary learning exercise | ESP32 in target design | **Yes** |
+| Device public key | Device / derived from device key | CSR/certificate | No |
+| Device CSR | **ESP32** in target design; laptop for current learning exercise | Provisioning/CA | No, but contains public identity material |
 | Device certificate | CA | ESP32 / verifier | No |
 
 ## Security requirements
@@ -175,6 +199,7 @@ Certificate  → CA-signed identity + public key
 5. Device certificates can be distributed to the device and to systems that need to authenticate it.
 6. Production devices should use protected key storage where available; this lab currently uses NVS as a prototype persistence mechanism and will evaluate stronger ESP32-specific protection before production use.
 7. The provisioning/bootstrap mechanism must be treated as a separate trust decision and documented before production use.
+8. Laptop-generated learning keys and CSRs must not be confused with the target device identity lifecycle.
 
 ## Current implementation
 
@@ -263,13 +288,53 @@ Subsequent boot/reset
   → do not generate a new key
 ```
 
+### Test 3 — Laptop CSR generation and inspection
+
+For learning purposes, a separate RSA-2048 device key was generated on the laptop:
+
+```text
+openssl genrsa -out device-001.key.pem 2048
+```
+
+A CSR was then generated interactively:
+
+```text
+openssl req -new -key device-001.key.pem -out device-001.csr.pem
+```
+
+The requested subject was chosen by the operator and became:
+
+```text
+C=IN, ST=UK, L=London, O=Merck, OU=MilliQ, CN=esp32-device-001
+```
+
+The CSR was inspected with:
+
+```text
+openssl req -in device-001.csr.pem -text -noout
+```
+
+Observed results:
+
+- X.509 Certificate Request Version 1.
+- Subject contains the requested identity values above.
+- RSA public key size: 2048 bits.
+- Signature algorithm: `sha256WithRSAEncryption`.
+- No requested certificate extensions were present.
+
+**PASS** — the CSR was successfully created and inspected.
+
+This was deliberately done on the laptop only to understand CSR mechanics. The target production-inspired architecture remains device-generated keys and device-generated CSRs.
+
 ## Generated artifacts
 
 ### Device private key
 
-- Generated by: ESP32
-- Stored in: ESP32 NVS (`device` namespace, `private_key` entry)
-- Consumed by: future CSR generation and TLS/mTLS
+- Target generator: ESP32
+- Current learning generator: laptop
+- Target storage: ESP32 NVS
+- Current learning storage: local PKI workspace
+- Consumed by: CSR generation and future TLS/mTLS
 - Secret: **Yes**
 - Not printed to Serial
 - Not transmitted to the CA/backend
@@ -278,15 +343,22 @@ Subsequent boot/reset
 
 - Generated as part of the RSA key pair
 - Derived from the private key when needed
-- Will be included in the CSR
+- Included in the CSR
 - Secret: No
 
 ### Device CSR
 
-- **Not generated yet**
-- Next artifact to implement
-- Will be generated on the ESP32 using the persisted private key
-- Will contain the device public key and requested subject identity
+- Target generator: ESP32
+- Current learning generator: laptop
+- Current artifact: `device-001.csr.pem`
+- Contains the device public key and requested subject identity
+- Secret: No, but it contains identity information
+
+### Device certificate
+
+- Not generated yet
+- Next artifact in this milestone
+- Will be produced by signing the CSR with the CognixVision Root CA
 
 ## Device identity naming
 
@@ -298,7 +370,7 @@ esp32-device-001
 
 This is an application-level lab identifier. It is not being treated as an immutable hardware identifier.
 
-For the first CSR implementation, this identifier will be used as the requested certificate subject CN. A later provisioning design can introduce a stronger device identifier/attestation mechanism.
+The current laptop CSR uses this identifier as the requested certificate subject CN. A later provisioning design can introduce a stronger device identifier/attestation mechanism.
 
 ## Decisions made
 
@@ -310,6 +382,9 @@ A normal boot/reset must not create a new device identity. Persistent NVS state 
 
 ### Separate key per device
 Each device gets its own unique key pair. Compromise of one device key should not expose the CA private key or automatically compromise other devices.
+
+### Laptop CSR as a temporary learning exercise
+The laptop is being used temporarily to demonstrate CSR creation and certificate signing mechanics without adding CSR-generation complexity to the ESP32 firmware at the same time. This does not change the target architecture.
 
 ### RSA Root CA, RSA device key for the current lab step
 The Root CA uses RSA 4096. The current device experiment uses RSA 2048 because it is supported by the tested ESP32/Mbed TLS environment and gives us a straightforward end-to-end learning path. Algorithm selection remains an architectural decision to revisit before production deployment.
@@ -327,49 +402,46 @@ The implementation was simplified to use a one-byte identity marker stored with 
 ### Design correction: workstation-generated device key
 The initial plan proposed generating `esp32-device-001.key` on the workstation. That was corrected before implementation because the private key should be generated and retained by the device in the production-inspired architecture.
 
+The current laptop CSR exercise uses a separate learning key only; that key is not the ESP32 device key.
+
 ## What changed from the previous milestone
 
-Milestone 02 established the Root CA trust anchor. Milestone 03 now has a working device-side identity lifecycle:
+Milestone 02 established the Root CA trust anchor. Milestone 03 now has a working device-side identity lifecycle and a verified CSR learning flow:
 
 ```text
 Root CA
   │
-  │ will eventually sign
+  │ will sign
   ▼
 Device CSR
   ▲
   │ generated using
   │
-ESP32 device private key
+Device private key
 ```
 
-The ESP32 now generates its device key once and retains it across normal resets.
+The ESP32 now generates its device key once and retains it across normal resets. Separately, the laptop exercise demonstrated how a CSR is constructed from a device private key and requested identity.
 
 ## What you should now understand
 
 - The Root CA has its own key pair; the device has a completely separate key pair.
-- The ESP32 generates its device private key locally.
+- The ESP32 generates its device private key locally in the target architecture.
 - The device private key is generated **once**, not on every boot.
 - NVS provides persistence across reset; it does not by itself make the stored private key hardware-protected.
 - The private key should never be sent to the CA or backend.
 - The public key can be shared through the CSR.
 - The CSR proves that the requester possesses the corresponding private key because the CSR is signed by that key.
-- The CA signs the CSR and returns a certificate.
+- The subject values in a CSR are requested by the CSR creator; the CA decides what it will ultimately certify.
+- A CSR is not yet a certificate.
+- The CA signs the CSR to create the device certificate.
 - The resulting certificate and private key will later allow the ESP32 to authenticate using mTLS.
 
-## Next step — CSR generation
+## Current next step — CA signing
 
-We will now implement **CSR generation on the ESP32**.
+The CSR learning exercise is complete. The next step is to use the CognixVision Root CA private key to sign the laptop-generated learning CSR and create:
 
-The CSR implementation will:
+```text
+device-001.crt
+```
 
-1. Load the persisted device private key from NVS.
-2. Parse it into an Mbed TLS key context.
-3. Create an X.509 CSR using the device private key.
-4. Set the requested subject to the lab device identity (`CN=esp32-device-001`).
-5. Sign the CSR with the device private key.
-6. Produce the CSR in PEM format.
-7. Print the CSR to Serial for this lab so it can be copied to the CA/provisioning workstation.
-8. **Never print or transmit the private key.**
-
-The CSR will then be inspected and verified before we proceed to CA signing.
+The signing operation will be documented and then verified. This certificate is a **learning artifact**, not yet the final ESP32 production identity certificate.
