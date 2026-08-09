@@ -1,7 +1,7 @@
 # Milestone 02 — Private IoT Certificate Authority
 
 ## Status
-In progress — Root CA private key generated
+In progress — Root CA private key generated and verified
 
 ## Objective
 Create a private Certificate Authority (CA) for the CognixVision IoT lab so that device certificates can later be issued and verified without depending on a public CA.
@@ -147,10 +147,10 @@ Completed:
 1. Verified OpenSSL is available.
 2. Created the dedicated local PKI directory outside the Git repository.
 3. Generated the Root CA private key using RSA 4096-bit key generation.
+4. Verified the RSA private key with OpenSSL; result: `RSA key ok`.
 
 Next:
 
-4. Inspect the generated private key without exposing its secret contents.
 5. Generate the self-signed Root CA certificate.
 6. Inspect and verify the certificate.
 7. Record the actual results.
@@ -163,10 +163,20 @@ Completed so far:
 - OpenSSL availability verified with `openssl version`.
 - Root CA private-key generation completed successfully.
 - Private key file exists in the local PKI directory.
+- Private key integrity verified with:
+
+```text
+openssl rsa -in cognixvision-root-ca.key -check -noout
+```
+
+Result:
+
+```text
+RSA key ok
+```
 
 Remaining:
 
-- inspect key metadata without exposing the private material;
 - inspect the root certificate subject, issuer, validity and public key;
 - verify that the root certificate is self-signed;
 - confirm no private key is present in Git.
@@ -202,6 +212,16 @@ C:\Users\Dibin\Workspace\cognixvision-pki\cognixvision-root-ca.key
 
 The key contents were not shared or committed.
 
+### Private key integrity check
+
+OpenSSL reported:
+
+```text
+RSA key ok
+```
+
+This confirms that the generated RSA private key passed OpenSSL's internal consistency check.
+
 ## Problems encountered
 
 None so far.
@@ -219,7 +239,7 @@ The public key is mathematically derived from the private key and will be repres
 
 ## What changed from the previous milestone
 
-Milestone 01 provided network connectivity and Wi-Fi provisioning. Milestone 02 has now created the first cryptographic identity artifact: the CA private key.
+Milestone 01 provided network connectivity and Wi-Fi provisioning. Milestone 02 has now created and verified the first cryptographic identity artifact: the CA private key.
 
 ## What you should now understand
 
@@ -228,8 +248,9 @@ Milestone 01 provided network connectivity and Wi-Fi provisioning. Milestone 02 
 - The corresponding public key is used by others to **verify** those signatures.
 - We do not need a separate public-key file because the public key can be derived from the private key and will be carried in the CA certificate.
 - The CA private key is secret; the CA certificate/public key is intended to be shareable as trust material.
+- `RSA key ok` means OpenSSL successfully checked the mathematical consistency of our private key.
 - A CA does not need to be contacted every time a certificate is validated. A verifier can validate a certificate locally using the trusted CA certificate and cryptographic signatures.
 
 ## Next step
 
-Inspect the generated private key's metadata without printing or exposing the private key contents. Only after that will we generate the Root CA certificate.
+Generate the self-signed Root CA certificate from the private key. Only after generation will we inspect its identity, validity, public key and self-signature.
