@@ -35,6 +35,8 @@ Remain LOW for >= 5 seconds?
 Start WiFiManager configuration portal
 ```
 
+The implementation deliberately does **not** call `resetSettings()` when the BOOT button is held. The action means "reconfigure Wi-Fi", not "erase all Wi-Fi settings".
+
 ## Verification
 
 The button was first tested independently and produced the expected `BOOT PRESSED` output. The integrated implementation then successfully produced:
@@ -45,7 +47,7 @@ BOOT held for 5 seconds!
 Starting Wi-Fi configuration...
 ```
 
-WiFiManager subsequently created `ESP32-Setup` and opened the configuration portal.
+WiFiManager subsequently created `ESP32-Setup`, exposed the configuration portal at `192.168.4.1`, and connected to the newly selected Wi-Fi network.
 
 ## Design principle
 
