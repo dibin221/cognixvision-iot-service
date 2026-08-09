@@ -2,7 +2,9 @@
 
 ## Current stage
 
-The project is being built incrementally. The current focus is the ESP32 device and its network connectivity. MQTT, backend services, and device mTLS will be introduced in later stages.
+The project is currently focused on ESP32 network connectivity and Wi-Fi provisioning.
+
+Only the device-side Wi-Fi functionality has been implemented so far. MQTT, backend services, sensor telemetry, device certificates, and mTLS are planned but not yet implemented.
 
 ## Current architecture
 
@@ -11,7 +13,7 @@ The project is being built incrementally. The current focus is the ESP32 device 
 | ESP32 DevKit      |
 | Arduino C++       |
 |                   |
-| Ultrasonic sensor |
+| Wi-FiManager      |
 +---------+---------+
           |
           | Wi-Fi
@@ -22,21 +24,53 @@ The project is being built incrementally. The current focus is the ESP32 device 
 +-------------------+
 ```
 
-The ESP32 can also temporarily operate as a Wi-Fi Access Point during provisioning:
+The ESP32 normally operates as a Wi-Fi station and connects using persisted credentials.
+
+## Wi-Fi provisioning architecture
+
+A 5-second hold of the physical `BOOT` button triggers provisioning.
 
 ```text
-Phone / Laptop
-      |
-      | connects to
-      v
-ESP32-Setup
-      |
-      v
-192.168.4.1
-      |
-      v
-WiFiManager web portal
+                  BOOT held 5 sec
+                         |
+                         v
+                    +---------+
+                    |  ESP32  |
+                    +----+----+
+                         |
+                         | creates temporary AP
+                         v
+                  +--------------+
+                  | ESP32-Setup  |
+                  | 192.168.4.1  |
+                  +------+-------+
+                         |
+                         | configuration portal
+                         v
+                    Phone/Laptop
+                         |
+                         | select Wi-Fi
+                         v
+                    New Wi-Fi AP
+                         |
+                         v
+                    ESP32 connects
+                         |
+                         v
+                  Credentials persist
 ```
+
+## Verified behaviour
+
+The device successfully:
+
+- connected to a phone hotspot;
+- received a DHCP address;
+- entered provisioning mode using the BOOT button;
+- created `ESP32-Setup`;
+- exposed the WiFiManager portal at `192.168.4.1`;
+- connected to the newly selected Wi-Fi network; and
+- persisted the new Wi-Fi configuration.
 
 ## Planned architecture
 
@@ -55,4 +89,4 @@ Spring Boot Backend
   +--> Device commands
 ```
 
-Device identity and mutual TLS will be added as a later milestone.
+Device identity, certificates, CSR/CA workflow, and mutual TLS will be introduced only in later milestones.
