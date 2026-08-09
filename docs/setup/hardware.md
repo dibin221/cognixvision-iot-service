@@ -1,12 +1,10 @@
 # Hardware Setup
 
-## Hardware
-
-Current hardware:
+## Current hardware
 
 - ESP32 DevKit
 - Breadboard
-- Ultrasonic distance sensor
+- Ultrasonic distance sensor (not integrated yet)
 - USB data cable
 
 ## ESP32 setup
@@ -24,12 +22,28 @@ BOOT not pressed -> GPIO0 HIGH
 BOOT pressed     -> GPIO0 LOW
 ```
 
-The project uses a 5-second BOOT long press as the Wi-Fi provisioning trigger.
+The firmware uses a continuous 5-second BOOT long press as the Wi-Fi provisioning trigger.
 
-## Current network test
+## Current network milestone
 
-The ESP32 has successfully connected to a phone hotspot and received a DHCP address. A browser-based HTTP endpoint was also tested successfully.
+The ESP32 has successfully connected to a phone hotspot and received a DHCP address.
 
-## Next hardware milestone
+WiFiManager provisioning was also verified:
 
-Connect the ultrasonic sensor and continuously publish measured distance from the ESP32.
+```text
+BOOT held 5 seconds
+        |
+        v
+ESP32-Setup AP
+        |
+        v
+192.168.4.1 configuration portal
+        |
+        v
+Select Wi-Fi
+        |
+        v
+ESP32 connects to new network
+```
+
+The ultrasonic sensor is physically available but has **not yet been connected or programmed**. Sensor integration is the next hardware milestone.
