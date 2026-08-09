@@ -16,10 +16,13 @@ Use the existing ESP32 DevKit `BOOT` button on GPIO0. A 5-second long press trig
 
 No additional physical button is required.
 
-## Flow
+## Normal connection flow
 
 ```text
-Normal startup
+ESP32 startup
+    |
+    v
+WiFiManager
     |
     v
 Saved Wi-Fi credentials
@@ -28,10 +31,10 @@ Saved Wi-Fi credentials
 Connect to Wi-Fi
     |
     v
-Normal operation
+Continue application startup
 ```
 
-Provisioning flow:
+## Provisioning flow
 
 ```text
 BOOT held for 5 seconds
@@ -60,11 +63,15 @@ One initial connection attempt failed and a subsequent retry succeeded.
 
 ## Timeout
 
-A 10-second Wi-Fi connection timeout was selected so a connection attempt does not wait indefinitely.
+A 10-second Wi-Fi connection timeout was selected so an individual connection attempt does not wait indefinitely.
 
 ```cpp
 wifiManager.setConnectTimeout(10);
 ```
+
+## Important design boundary
+
+This milestone only handles Wi-Fi configuration. It does not yet implement MQTT, sensor telemetry, device identity, certificates, or mTLS.
 
 ## Future improvements
 
