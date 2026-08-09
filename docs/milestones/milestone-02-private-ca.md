@@ -107,7 +107,7 @@ No MQTT or backend mTLS is being configured yet.
 ### Current local artifact
 
 ```text
-C:\Users\Dibin\Workspace\cognixvision-pki\
+<local-pki-directory>/
 └── cognixvision-root-ca.key
 ```
 
@@ -204,10 +204,10 @@ OpenSSL 4.0.1
 
 ### Root CA private key
 
-Generated successfully at:
+Generated successfully in the dedicated local PKI directory:
 
 ```text
-C:\Users\Dibin\Workspace\cognixvision-pki\cognixvision-root-ca.key
+<local-pki-directory>/cognixvision-root-ca.key
 ```
 
 The key contents were not shared or committed.
@@ -236,6 +236,9 @@ The CA private key is intentionally excluded from the repository. Git will conta
 
 ### Do not store a separate CA public-key file yet
 The public key is mathematically derived from the private key and will be represented in the Root CA certificate. A separate public-key file is unnecessary for the current workflow.
+
+### Do not expose machine-specific paths in project documentation
+Local filesystem paths are represented using `<local-pki-directory>` so the documentation remains portable across machines and users.
 
 ## What changed from the previous milestone
 
