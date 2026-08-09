@@ -1,47 +1,60 @@
-# Cognivison IoT Services
+# Cognivision IoT Services
 
-Hands-on IoT platform project built around an ESP32 device, Wi-Fi provisioning, MQTT, Spring Boot services, and mutual TLS/device identity.
+Hands-on IoT platform project built incrementally around an ESP32 device and a cloud/backend platform.
 
-## Project goals
+## Current focus
 
-- Learn ESP32/embedded development using Arduino C++.
-- Build a real device-to-backend communication flow.
-- Implement configurable Wi-Fi provisioning and recovery.
-- Explore MQTT for IoT telemetry and commands.
-- Implement device identity and mTLS.
-- Build backend services with Spring Boot.
-- Document architecture and engineering decisions as the project evolves.
+The project is currently at the **Wi-Fi configuration stage**. No MQTT, sensor telemetry, backend integration, certificates, or mTLS has been implemented yet.
 
-## Current status
+### Implemented
 
-### Completed
-
-- ESP32 DevKit configured in Arduino IDE.
+- ESP32 DevKit configured in Arduino IDE using C++.
 - Serial communication verified at 115200 baud.
-- ESP32 connected to Wi-Fi and obtained a DHCP address.
-- Basic HTTP endpoint tested from a browser.
+- ESP32 connected to a Wi-Fi network and received a DHCP address.
 - WiFiManager added for configurable Wi-Fi.
 - BOOT button verified as GPIO0.
-- 5-second BOOT long press implemented as Wi-Fi provisioning trigger.
-- ESP32-Setup temporary access point and configuration portal verified.
+- 5-second BOOT long press implemented as a Wi-Fi provisioning trigger.
+- Temporary `ESP32-Setup` access point and WiFiManager configuration portal verified.
 - New Wi-Fi credentials successfully applied and persisted.
-- Wi-Fi connection timeout configured to 10 seconds.
+- 10-second Wi-Fi connection timeout configured.
 
-### Next
+## Current Wi-Fi flow
 
-- Improve Wi-Fi provisioning/reconnection state handling.
-- Read ultrasonic sensor data continuously.
-- Add device telemetry.
-- Introduce MQTT.
-- Build Spring Boot MQTT/backend integration.
-- Explore device certificates, CSR generation, CA hierarchy, and mTLS.
+```text
+ESP32 startup
+    |
+    v
+WiFiManager
+    |
+    +---- saved credentials ----> connect to Wi-Fi
+    |
+    +---- BOOT held 5 seconds --> ESP32-Setup AP
+                                      |
+                                      v
+                              WiFiManager portal
+                                      |
+                                      v
+                              configure Wi-Fi
+                                      |
+                                      v
+                              connect + persist
+```
+
+## Planned stages
+
+1. Complete Wi-Fi recovery/reconnection behaviour.
+2. Connect and read the ultrasonic sensor.
+3. Generate device telemetry.
+4. Introduce MQTT.
+5. Build the Spring Boot backend integration.
+6. Add device identity, certificates, CSR/CA flow, and mTLS.
 
 ## Repository structure
 
 ```text
 firmware/     ESP32 Arduino C++ firmware
-docs/         Architecture, decisions, setup and experiments
-backend/      Backend services (as introduced)
+docs/         Architecture, decisions and setup notes
+backend/      Reserved for future backend implementation
 ```
 
 ## Documentation
