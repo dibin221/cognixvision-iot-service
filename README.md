@@ -1,65 +1,64 @@
-# Cognivision IoT Services
+# CognixVision IoT Service
 
-Hands-on IoT platform project built incrementally around an ESP32 device and a cloud/backend platform.
+A production-inspired IoT learning project built incrementally around an ESP32 device and a backend platform.
 
-## Current focus
+## Documentation-first rule
 
-The project is currently at the **Wi-Fi configuration stage**. No MQTT, sensor telemetry, backend integration, certificates, or mTLS has been implemented yet.
+Documentation is a mandatory part of every milestone. Code, architecture, decisions, tests, generated artifacts, and documentation must remain synchronized.
 
-### Implemented
+For every implementation step:
 
-- ESP32 DevKit configured in Arduino IDE using C++.
-- Serial communication verified at 115200 baud.
-- ESP32 connected to a Wi-Fi network and received a DHCP address.
-- WiFiManager added for configurable Wi-Fi.
-- BOOT button verified as GPIO0.
-- 5-second BOOT long press implemented as a Wi-Fi provisioning trigger.
-- Temporary `ESP32-Setup` access point and WiFiManager configuration portal verified.
-- New Wi-Fi credentials successfully applied and persisted.
-- 10-second Wi-Fi connection timeout configured.
+`Understand → Plan → Document → Implement → Test → Inspect → Update documentation → Update roadmap → Commit`
 
-## Current Wi-Fi flow
+A milestone is complete only when the implementation works, tests have been performed, and the relevant documentation has been updated with the actual result.
 
-```text
-ESP32 startup
-    |
-    v
-WiFiManager
-    |
-    +---- saved credentials ----> connect to Wi-Fi
-    |
-    +---- BOOT held 5 seconds --> ESP32-Setup AP
-                                      |
-                                      v
-                              WiFiManager portal
-                                      |
-                                      v
-                              configure Wi-Fi
-                                      |
-                                      v
-                              connect + persist
-```
+## Current status
 
-## Planned stages
+### Milestone 01 — Wi-Fi provisioning — COMPLETE
 
-1. Complete Wi-Fi recovery/reconnection behaviour.
-2. Connect and read the ultrasonic sensor.
-3. Generate device telemetry.
-4. Introduce MQTT.
-5. Build the Spring Boot backend integration.
-6. Add device identity, certificates, CSR/CA flow, and mTLS.
+The ESP32 can:
+
+- run firmware built with Arduino IDE / C++
+- connect to a configured Wi-Fi network using WiFiManager
+- persist Wi-Fi credentials
+- expose a temporary `ESP32-Setup` access point for provisioning
+- open a WiFiManager configuration portal
+- use the physical BOOT button (GPIO0) as a 5-second Wi-Fi reconfiguration trigger
+- use a 10-second Wi-Fi connection timeout
+
+Verified during the milestone:
+
+- serial communication at 115200 baud
+- Wi-Fi connection and DHCP address assignment
+- browser access to the ESP32 over the local network
+- BOOT/GPIO0 long-press detection
+- `ESP32-Setup` AP at `192.168.4.1`
+- successful provisioning and reconnection to the configured Wi-Fi
+
+No MQTT, sensor telemetry, certificates, mTLS, or backend device authentication has been implemented yet.
+
+## Next milestone
+
+### Milestone 02 — Private IoT CA
+
+We will first understand and create a local Certificate Authority. Only after that milestone is documented and verified will we move to device key generation, CSR creation, certificate signing, and eventually mTLS.
 
 ## Repository structure
 
 ```text
-firmware/     ESP32 Arduino C++ firmware
-docs/         Architecture, decisions and setup notes
-backend/      Reserved for future backend implementation
+docs/
+├── roadmap.md
+├── glossary.md
+├── architecture/
+├── milestones/
+└── security/
+
+firmware/
+└── esp32/
+
+backend/
 ```
 
-## Documentation
+## Source of truth
 
-- [Architecture](docs/architecture/overview.md)
-- [Hardware setup](docs/setup/hardware.md)
-- [Wi-Fi provisioning](docs/decisions/002-wifi-provisioning.md)
-- [BOOT provisioning](docs/decisions/003-boot-button-provisioning.md)
+The repository documentation is the long-term record of the project. When implementation decisions change, existing documentation must be corrected rather than leaving contradictory historical descriptions.
